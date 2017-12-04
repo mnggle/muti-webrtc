@@ -10,58 +10,55 @@ var curId;
 var fromId;
 var remoteStream;
 var turnReady;
+var isReconnect;
 var pcConfig = {
   'iceServers': [{
     'urls': 'stun:stun.l.google.com:19302'
   }]
 };
+var video_accessed = true;
+var audio_accessed = true;
+var room;
 var tempId;//临时ID对象
 // Set up audio and video regardless of what devices are present.
 var sdpConstraints = {
   offerToReceiveAudio: true,
   offerToReceiveVideo: true
 };
-/////////////////////////////////////////////
-var room = 'foo';
+
+
+// var room = 'foo';
 // Could prompt for room name:
-// room = prompt('Enter room name:');
+room = prompt('Enter room name:');
 
 var socket = io.connect();
 
-if (room !== '') {
-  socket.emit('create or join', room);
-  console.log('Attempted to create or  join room', room);
-}
-//房间创建后触发
-// socket.on('created', function(room,id,connections) {
-//   console.log('Created room' + room);
-//   // console.log(obj)
-//   curId = id
-//   obj[fromId] = {};
-// });
-//房间满后触发
-// socket.on('full', function(room) {
-//   console.log('Room ' + room + ' is full');
-// });
-socket.on('join', function (room,id,connections){
-  if (connections.length===1) {
-  console.log('Created room' + room);
-  // console.log(obj)
-  }else{
-    console.log('Another peer made a request to join room ' + room);
-    console.log('This peer is the initiator of room ' + room + '!');
-  };
-  socket.emit('message',"got user media");
-});
-// socket.on('my message', function (id,connections){
-//   console.log(id)
-//   curId = id
-//   obj[fromId] = {};
-// });
-// socket.on('joined', function(room) {
-//   console.log('joined: ' + room);
-//   // isChannelReady = true;
-// });
+
+var localVideo = document.querySelector('#localVideo');
+var remoteVideo = document.querySelector('#remoteVideo');
+var videoBox = document.getElementById('videos');
+var hangupBtn = document.getElementById('hangupBtn');
+var callBtn = document.querySelector('#callBtn');
+var disableVideo = document.querySelector('#disableVideo');
+var disableAudio = document.querySelector('#disableAudio');
+var createRoom = document.querySelector('#createRoom');
+createRoom.onclick=function(){
+  if (room !== '') {
+    socket.emit('create or join', room);
+    console.log('Attempted to create or  join room', room);
+  }
+  socket.on('join', function (room,id,numClients){
+    if (numClients===1) {
+    console.log('Created room' + room);
+    // console.log(obj)
+    }else{
+      console.log('Another peer made a request to join room ' + room);
+      console.log('This peer is the initiator of room ' + room + '!');
+    };
+    getUserMidea();
+  });
+};
+/////////////////////////////////////////////
 
 socket.on('log', function(array) {
   console.log.apply(console, array);
@@ -103,41 +100,85 @@ socket.on('message', function(message,id) {
     doCall(id)
   }else if(message==='exit'){
     var removeNode = document.getElementById(id);
+    console.log(id);
+    console.log(removeNode)
     if (obj[id]&&removeNode) {
       delete obj[id]
-      console.log(removeNode);
       videoBox.removeChild(removeNode);
+      console.log(videoBox)
     }
   }
 });
 
 ////////////////////////////////////////////////////
 
-var localVideo = document.querySelector('#localVideo');
-var remoteVideo = document.querySelector('#remoteVideo');
-var videoBox = document.getElementById('videos');
-var hangupBtn = document.getElementById('hangupBtn');
-var callBtn = document.querySelector('#callBtn');
-hangupBtn.onclick = hangup;
-callBtn.onclick = function(){
-  socket.emit('message',"got user media");
-};
-navigator.mediaDevices.getUserMedia({
-  audio: false,
-  video: true
-})
-.then(gotStream)
-.catch(function(e) {
-  alert('getUserMedia() error: ' + e.name);
+
+
+disableAudio.addEventListener('click',function(){
+    console.log(localStream.getAudioTracks());
+    var audioTrack = localStream.getAudioTracks();
+  if (audio_accessed) {
+    if (audioTrack.length > 0) {
+        audioTrack[0].enabled = false;
+    };
+    audio_accessed  = false
+  }else{
+    audioTrack[0].enabled = true;
+    audio_accessed  = true
+  }
 });
 
+disableVideo.addEventListener('click',function(){
+    console.log(localStream.getVideoTracks());
+    var videoTrack = localStream.getVideoTracks();
+  if (video_accessed) {
+    if (videoTrack.length > 0) {
+        videoTrack[0].enabled = false;
+        localVideo.src = window.URL.createObjectURL(localStream);
+    };
+    video_accessed  = false
+  }else{
+    videoTrack[0].enabled = true;
+    video_accessed  = true
+  }
+});
+
+hangupBtn.onclick = function(){
+  socket.emit('leave');
+  sendMessage('hangup');
+  obj = {};
+  localVideo.src = "";
+  var allVideoTag = videoBox.childNodes;
+  for (var i = allVideoTag.length - 1; i >= 0; i--) {
+    if (allVideoTag[i].nodeName==="VIDEO"&&allVideoTag[i].id!='localVideo') {
+      videoBox.removeChild(allVideoTag[i]);
+    }
+    // var audioTrack = localStream.getAudioTracks();
+    // var videoTrack = localStream.getVideoTracks();
+    // localStream.removeTrack(videoTrack[0]);
+    // localStream.removeTrack(audioTrack[0]);
+  }
+};
+// callBtn.onclick = function(){
+//   socket.emit('message',"got user media");
+// };
+
+function getUserMidea(){
+  navigator.mediaDevices.getUserMedia({
+    audio: true,
+    video: { width: 100, height: 100 }
+  })
+  .then(gotStream)
+  .catch(function(e) {
+    alert('getUserMedia() error: ' + e.name);
+  });
+};
 function gotStream(stream) {
   console.log('Adding local stream.');
   localVideo.src = window.URL.createObjectURL(stream);
   localStream = stream;
-  // sendMessage('got user media');
+  sendMessage('got user media');
 };
-
 var constraints = {
   video: true
 };
@@ -151,8 +192,10 @@ if (location.hostname !== 'localhost') {
 function maybeStart(id) {
   console.log('>>>>>>> maybeStart() ');
     createPeerConnection(id);
+    console.log(localStream)
     obj[id].addStream(localStream);
 };
+
 function createPeerConnection(id) {
   console.log('>>>>>> creating peer connection');
   try {
@@ -179,7 +222,6 @@ function createPeerConnection(id) {
 // window.onbeforeunload = function() {
 //   sendMessage('bye');
 // };
-
 function handleIceCandidate(event) {
   console.log('icecandidate event: ', event);
   if (event.candidate) {
@@ -270,17 +312,6 @@ function requestTurn(turnURL) {
     };
     xhr.open('GET', turnURL, true);
     xhr.send();
-  }
-};
-
-function hangup(){
-  sendMessage('hangup')
-  obj = {};
-  var allVideoTag = videoBox.childNodes;
-  for (var i = allVideoTag.length - 1; i >= 0; i--) {
-    if (allVideoTag[i].nodeName==="VIDEO"&&allVideoTag[i].id!='localVideo') {
-      videoBox.removeChild(allVideoTag[i]);
-    }
   }
 };
 
