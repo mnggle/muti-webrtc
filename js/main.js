@@ -1,45 +1,47 @@
 'use strict';
 
-var isChannelReady = false;
-// var isInitiator = false;
-var isStarted = false;
-var localStream;
-var obj = {}
-var pc;
-var curId;
-var fromId;
-var remoteStream;
-var turnReady;
-var isReconnect;
-var pcConfig = {
-  'iceServers': [{
-    'urls': 'stun:stun.l.google.com:19302'
-  }]
-};
-var video_accessed = true;
-var audio_accessed = true;
-var room;
-var tempId;//临时ID对象
-// Set up audio and video regardless of what devices are present.
-var sdpConstraints = {
-  offerToReceiveAudio: true,
-  offerToReceiveVideo: true
-};
-
-
-// var room = 'foo';
-// Could prompt for room name:
-
-var socket = io.connect();
-
-
-var localVideo = document.querySelector('#localVideo');
-var remoteVideo = document.querySelector('#remoteVideo');
-var videoBox = document.getElementById('videos');
-var hangupBtn = document.getElementById('hangupBtn');
-var disableVideo = document.querySelector('#disableVideo');
-var disableAudio = document.querySelector('#disableAudio');
-var createRoom = document.querySelector('#createRoom');
+var localStream,
+    obj = {},// RTCPeerConnection对象
+    channelObj = {},//dataChannel对象
+    remoteStream,
+    turnReady,
+    pcConfig = {
+      'iceServers': [{
+        'urls': 'stun:stun.l.google.com:19302'
+      }]
+    },
+    video_accessed = true,
+    audio_accessed = true,
+    room,
+    // Set up audio and video regardless of what devices are present.
+    sdpConstraints = {
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: true
+    },
+    localVideo = document.querySelector('#localVideo'),
+    remoteVideo = document.querySelector('#remoteVideo'),
+    videoBox = document.getElementById('videos'),
+    hangupBtn = document.getElementById('hangupBtn'),
+    disableVideo = document.querySelector('#disableVideo'),
+    disableAudio = document.querySelector('#disableAudio'),
+    createRoom = document.querySelector('#createRoom'),
+    sendButton = document.querySelector('button#sendButton'),
+    dataChannelSend = document.querySelector('textarea#dataChannelSend'),
+    messageBox = document.getElementById('messageBox'),
+    socket = io.connect();
+    sendButton.onclick = sendData;
+    dataChannelSend.value = "";
+    function sendData() {
+      var data = dataChannelSend.value;
+      //本地的消息显示
+      var myDiv = document.createElement("div");
+      myDiv.innerHTML = data;
+      myDiv.style.textAlign = "right";
+      messageBox.appendChild(myDiv)
+      for(var id in channelObj){
+        channelObj[id].send(data);
+      };
+    };
 createRoom.onclick=function(){
   room = prompt('Enter room name:');
   if (room) {
@@ -77,8 +79,8 @@ socket.on('message', function(message,id) {
   // console.log(message)
   if (message === 'got user media' && id) {
     maybeStart(id);
+    createChannel(id,false);
     sendMessage('back id',id);
-    console.log(obj)
   } else if (message.type === 'offer') {
       // maybeStart();
       console.log(obj)
@@ -95,8 +97,8 @@ socket.on('message', function(message,id) {
     obj[id].addIceCandidate(candidate);
   }else if(message==="back id"){
     maybeStart(id);
-    console.log(obj)
-    doCall(id)
+    createChannel(id,true);
+    doCall(id);
   }else if(message==='exit'){
     var removeNode = document.getElementById(id);
     console.log(id);
@@ -105,17 +107,25 @@ socket.on('message', function(message,id) {
       delete obj[id]
       videoBox.removeChild(removeNode);
       console.log(videoBox)
-    }
+    };
+    delete channelObj[id]
+
   }
 });
+// 收到消息后的回调函数
+function onReceiveMessageCallback(event) {
+  // console.log(event)
+  var newDiv = document.createElement("div");
+  newDiv.innerHTML = event.data;
+  messageBox.appendChild(newDiv)
 
+
+}
 ////////////////////////////////////////////////////
-
-
-
+// 通过改变audioTrack[0].enabled的值来开关麦克风
 disableAudio.addEventListener('click',function(){
-    console.log(localStream.getAudioTracks());
-    var audioTrack = localStream.getAudioTracks();
+  console.log(localStream.getAudioTracks());
+  var audioTrack = localStream.getAudioTracks();
   if (audio_accessed) {
     if (audioTrack.length > 0) {
         audioTrack[0].enabled = false;
@@ -126,10 +136,10 @@ disableAudio.addEventListener('click',function(){
     audio_accessed  = true
   }
 });
-
+// 通过改变videoTrack[0].enabled的值来开关摄像头
 disableVideo.addEventListener('click',function(){
-    console.log(localStream.getVideoTracks());
-    var videoTrack = localStream.getVideoTracks();
+  console.log(localStream.getVideoTracks());
+  var videoTrack = localStream.getVideoTracks();
   if (video_accessed) {
     if (videoTrack.length > 0) {
         videoTrack[0].enabled = false;
@@ -141,11 +151,11 @@ disableVideo.addEventListener('click',function(){
     video_accessed  = true
   }
 });
-
 hangupBtn.onclick = function(){
   socket.emit('leave');
   sendMessage('hangup');
   obj = {};
+  channelObj = {};
   localVideo.src = "";
   var allVideoTag = videoBox.childNodes;
   for (var i = allVideoTag.length - 1; i >= 0; i--) {
@@ -214,6 +224,7 @@ function createPeerConnection(id) {
     return;
   }
 };
+
 // window.onbeforeunload = function() {
 //   sendMessage('bye');
 // };
@@ -231,7 +242,6 @@ function handleIceCandidate(event) {
     console.log(obj)
   }
 }
-
 // function handleRemoteStreamAdded(event) {
 //   console.log(event)
 //   console.log('Remote stream added.');
@@ -258,6 +268,51 @@ function doCall(id) {
       sendMessage(sessionDescription,id);
   },handleCreateOfferError);
 };
+
+//创建数据通道，根据布尔值flag来判断哪一方创建方
+function createChannel(id,flag){
+  var dataConstraint = null;
+  if (flag) {
+    channelObj[id] = obj[id].createDataChannel('sendDataChannel',dataConstraint);
+    console.log(channelObj[id])
+    channelObj[id].onopen = function(){
+      var readyState = channelObj[id].readyState;
+      console.log(readyState)
+      if (readyState === 'open') {
+        channelObj[id].onmessage = onReceiveMessageCallback;
+      }
+    };
+    sendMessage('channel connecting')
+  }else{
+    // channelObj[id].onclose = onSendChannelStateChange;
+    obj[id].ondatachannel = function(event) {
+      channelObj[id] = event.channel;
+      channelObj[id].onmessage = onReceiveMessageCallback;
+      var onReceiveChannelStateChange = function(){
+        var readyState = channelObj[id].readyState;
+      }
+    };
+  }
+};
+
+
+// function onSendChannelStateChange() {
+//   var readyState = sendChannel.readyState;
+//   trace('Send channel state is: ' + readyState);
+//   if (readyState === 'open') {
+//     dataChannelSend.disabled = false;
+//     dataChannelSend.focus();
+//     sendButton.disabled = false;
+//     closeButton.disabled = false;
+//   } else {
+//     dataChannelSend.disabled = true;
+//     sendButton.disabled = true;
+//     closeButton.disabled = true;
+//   }
+// }
+
+
+
 function doAnswer(id) {
   console.log('Sending answer to peer.');
   // console.log(id)
@@ -278,7 +333,6 @@ function setLocalAndSendMessage(sessionDescription) {
 }
 
 function onCreateSessionDescriptionError(error) {
-  trace('Failed to create session description: ' + error.toString());
 }
 
 function requestTurn(turnURL) {

@@ -6,25 +6,58 @@
   <title>Realtime communication with WebRTC</title>
 
   <link rel="stylesheet" href="/css/main.css" />
-
+  <style>
+    body{
+      font-size: 14px;
+    }
+    video{
+      width: 100px;
+      height: 100px;
+    }
+    button{
+      height: 20px;
+      line-height: 20px;
+      font-size: 12px;
+    }
+    textarea{
+      height:80px;
+      width: 150px;
+    }
+    .video-area{
+      margin-bottom:20px;
+    }
+    .message-box{
+      min-height: 50px;
+    }
+  </style>
 </head>
 
 <body>
 
   <h1>Realtime communication with WebRTC</h1>
-  <button id="createRoom">创建/加入房间</button>
-  <div id="videos">
-    <video id="localVideo" autoplay muted></video>
+  <div class="video-area">
+    <button id="createRoom">创建/加入房间</button>
+    <button id="disableVideo">摄像头</button>
+    <button id="disableAudio">麦克风</button>
+    <button id="hangupBtn">挂断</button>
+    <div id="videos">
+      <video id="localVideo" autoplay muted></video>
+    </div>
   </div>
-  <!-- <button id="callBtn">CALL</button> -->
-  <button id="disableVideo">摄像头</button>
-  <button id="disableAudio">麦克风</button>
-  <button id="hangupBtn">挂断</button>
+  <hr>
+  <div class="channel-area">
+    <div class="message-box" id="messageBox">
+    </div>
+    <div class="send-area">
+      <textarea name="" id="dataChannelSend"></textarea>
+    </div>
+    <button id="sendButton">Send</button>
+  </div>
+
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="js/lib/adapter.js"></script>
   <script src="js/main.js"></script>
-
 </body>
 
 </html>
