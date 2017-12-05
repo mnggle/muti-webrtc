@@ -29,7 +29,6 @@ var sdpConstraints = {
 
 // var room = 'foo';
 // Could prompt for room name:
-room = prompt('Enter room name:');
 
 var socket = io.connect();
 
@@ -38,26 +37,26 @@ var localVideo = document.querySelector('#localVideo');
 var remoteVideo = document.querySelector('#remoteVideo');
 var videoBox = document.getElementById('videos');
 var hangupBtn = document.getElementById('hangupBtn');
-var callBtn = document.querySelector('#callBtn');
 var disableVideo = document.querySelector('#disableVideo');
 var disableAudio = document.querySelector('#disableAudio');
 var createRoom = document.querySelector('#createRoom');
 createRoom.onclick=function(){
-  if (room !== '') {
+  room = prompt('Enter room name:');
+  if (room) {
     socket.emit('create or join', room);
     console.log('Attempted to create or  join room', room);
   }
-  socket.on('join', function (room,id,numClients){
-    if (numClients===1) {
-    console.log('Created room' + room);
-    // console.log(obj)
-    }else{
-      console.log('Another peer made a request to join room ' + room);
-      console.log('This peer is the initiator of room ' + room + '!');
-    };
-    getUserMidea();
-  });
 };
+socket.on('join', function (room,id,numClients){
+  if (numClients===1) {
+  console.log('Created room' + room);
+  // console.log(obj)
+  }else{
+    console.log('Another peer made a request to join room ' + room);
+    console.log('This peer is the initiator of room ' + room + '!');
+  };
+  getUserMidea();
+});
 /////////////////////////////////////////////
 
 socket.on('log', function(array) {
@@ -159,10 +158,6 @@ hangupBtn.onclick = function(){
     // localStream.removeTrack(audioTrack[0]);
   }
 };
-// callBtn.onclick = function(){
-//   socket.emit('message',"got user media");
-// };
-
 function getUserMidea(){
   navigator.mediaDevices.getUserMedia({
     audio: true,
