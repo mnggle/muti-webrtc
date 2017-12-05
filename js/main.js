@@ -3,6 +3,7 @@
 var localStream,
     obj = {},// RTCPeerConnection对象
     channelObj = {},//dataChannel对象
+    fileBuffer = [],
     remoteStream,
     turnReady,
     pcConfig = {
@@ -26,8 +27,10 @@ var localStream,
     disableAudio = document.querySelector('#disableAudio'),
     createRoom = document.querySelector('#createRoom'),
     sendButton = document.querySelector('button#sendButton'),
+    sendFile = document.getElementById('sendFile'),
     dataChannelSend = document.querySelector('textarea#dataChannelSend'),
     messageBox = document.getElementById('messageBox'),
+    downloadLink = document.querySelector('a#receivedFileLink'),
     socket = io.connect();
     sendButton.onclick = sendData;
     dataChannelSend.value = "";
@@ -109,17 +112,16 @@ socket.on('message', function(message,id) {
       console.log(videoBox)
     };
     delete channelObj[id]
-
+  }else if(message.type==="file message"){
+    channelObj[id].fileObj = message;
   }
 });
-// 收到消息后的回调函数
-function onReceiveMessageCallback(event) {
-  // console.log(event)
-  var newDiv = document.createElement("div");
-  newDiv.innerHTML = event.data;
-  messageBox.appendChild(newDiv)
 
 
+function readBlobAsDataURL(blob, callback) {
+    var a = new FileReader();
+    a.onload = function(e) {callback(e.target.result);};
+    a.readAsDataURL(blob);
 }
 ////////////////////////////////////////////////////
 // 通过改变audioTrack[0].enabled的值来开关麦克风
@@ -168,6 +170,40 @@ hangupBtn.onclick = function(){
     // localStream.removeTrack(audioTrack[0]);
   }
 };
+
+sendFile.addEventListener('change', function(ev){
+  var file = sendFile.files[0];
+  // io.emit('files',{"filename":file.name, "filesize":file.size, "room":FILES_ROOM});
+  sendMessage({
+    type:"file message",
+    'filename':file.name,
+    "filesize":file.size
+  })
+  // fileProgress.max = file.size;
+  var chunkSize = 16384;
+  var sliceFile = function(offset) {
+    var reader = new window.FileReader();
+    reader.onload = (function() {
+      return function(e) {
+        for(var id in channelObj){
+          // channelObj[id].send(data);
+          channelObj[id].send(e.target.result);
+        };
+        if (file.size > offset + e.target.result.byteLength) {
+          window.setTimeout(sliceFile, 0, offset + chunkSize);
+          }
+        // fileProgress.value = offset + e.target.result.byteLength;
+      };
+    })(file);
+    var slice = file.slice(offset, offset + chunkSize);
+    reader.readAsArrayBuffer(slice);
+  };
+  sliceFile(0);   
+  // console.log(slice);
+}, false);
+
+
+
 function getUserMidea(){
   navigator.mediaDevices.getUserMedia({
     audio: true,
@@ -224,7 +260,6 @@ function createPeerConnection(id) {
     return;
   }
 };
-
 // window.onbeforeunload = function() {
 //   sendMessage('bye');
 // };
@@ -271,6 +306,40 @@ function doCall(id) {
 
 //创建数据通道，根据布尔值flag来判断哪一方创建方
 function createChannel(id,flag){
+  var filesize = 0;
+  // 收到消息后的回调函数
+  var onReceiveMessageCallback = function(event) {
+     console.log(event)
+    if (typeof event.data ==="string") {
+      var newDiv = document.createElement("div");
+      newDiv.innerHTML = event.data;
+      messageBox.appendChild(newDiv)
+    }else{
+      fileBuffer.push(event.data);
+      filesize += event.data.byteLength;
+      console.log(channelObj[id].fileObj.filesize)
+      if (filesize===channelObj[id].fileObj.filesize) {
+        filesize = 0;
+        var received = new window.Blob(fileBuffer);
+        fileBuffer = [];
+        // console.log(received)
+        readBlobAsDataURL(received,function(dataUrl){
+          var newDiv = document.createElement("div");
+          var newImg = document.createElement("img");
+          newImg.src=dataUrl;
+          newImg.width = "100";
+          newImg.height = "100";
+          newDiv.appendChild(newImg);
+          messageBox.appendChild(newDiv)
+        })
+      }
+
+
+      // downloadLink.href = URL.createObjectURL(received);
+      // downloadLink.download = '123';
+      // downloadLink.appendChild(document.createTextNode("(" + fileSize + ") bytes"));
+    }
+  };
   var dataConstraint = null;
   if (flag) {
     channelObj[id] = obj[id].createDataChannel('sendDataChannel',dataConstraint);
