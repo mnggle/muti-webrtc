@@ -7,53 +7,59 @@
 
   <link rel="stylesheet" href="/css/main.css" />
   <style>
-    body{
-      font-size: 14px;
-    }
-    video{
-      width: 100px;
-      height: 100px;
-    }
-    button{
-      height: 20px;
-      line-height: 20px;
-      font-size: 12px;
-    }
-    textarea{
-      height:80px;
-      width: 150px;
-    }
-    .video-area{
-      margin-bottom:20px;
-    }
-    .message-box{
-      min-height: 50px;
-    }
+
   </style>
 </head>
 
 <body>
-
-  <h1>Realtime communication with WebRTC</h1>
-  <div class="video-area">
-    <button id="createRoom">创建/加入房间</button>
-    <button id="disableVideo">摄像头</button>
-    <button id="disableAudio">麦克风</button>
-    <button id="hangupBtn">挂断</button>
-    <div id="videos">
-      <video id="localVideo" autoplay muted></video>
-    </div>
+  <div class="outside-room" id="outsideRoom">
+    <div class="blur"></div>
+      <div class="join">
+        <div class="join-item">
+          <label for="localName">
+            你的姓名：
+          </label>
+          <input type="text" id="localName" name="localName">
+        </div>
+        <div class="join-item">
+          <label for="joinRoom">
+            房间名：
+          </label>
+          <input type="text" id="joinRoom" name="joinRoom">
+        </div>
+        <div class="join-item button">
+          <button id="createJoinRoom">创建/加入房间</button>
+        </div>
+      </div>
   </div>
-  <hr>
-  <div class="channel-area">
-    <div class="message-box" id="messageBox">
+  <div class="inside-room" id="insideRoom" style="display: none">
+    <h1 class="room">房间：<span id="roomName"></span></h1>
+    <div class="video-area">
+      <button class="small" id="disableVideo">摄像头</button>
+      <button class="small" id="disableAudio">麦克风</button>
+      <button class="handup small" id="hangupBtn">挂断</button>
+      <div class="video-box" id="videos">
+        <video id="localVideo" autoplay muted></video>
+      </div>
     </div>
-    <div class="send-area">
-      <textarea name="" id="dataChannelSend"></textarea>
+    <hr>
+    <div class="channel-area">
+      <div class="message-box" id="messageBox">
+      </div>
+      <div class="send-area">
+          <div class="send-input">
+            <input name="" id="textSend" value="">
+          </div>
+          <div class="send-btn">
+            <div class="send-img">
+              <input class="file-input" type="file" id="sendFile">
+              <button class="send-img">图片</button>
+            </div>
+              <button class="send-text" id="sendButton">发送</button>
+          </div>
+      </div>
+      <!-- <a id="receivedFileLink">下载</a> -->
     </div>
-    <button id="sendButton">Send</button>
-    <input type="file" id="sendFile">
-    <a id="receivedFileLink">下载</a>
   </div>
 
 
