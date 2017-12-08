@@ -7,10 +7,29 @@ html,body{
 }
 .video-area{
   margin-bottom:20px;
-  text-align: center;
+  padding: 0 20px;
+  /*text-align: center;*/
 }
-.video-box{
+.remote-video,.local-video{
+	display: inline-block!important;
 	margin-top: 20px;
+	position: relative;
+}
+.remote-video p,.local-video p{
+	position: absolute;
+	top: 0;
+	left: 14px;
+	z-index: 1000;
+	background-color: #fff;
+	padding: 5px;
+}
+.remote-video div{
+	margin-right: 15px;
+	display: inline-block;
+	position: relative;
+}
+.local-video{
+	margin-right: 50px;
 }
 body {
   font-family: sans-serif;
@@ -150,4 +169,16 @@ button.small{
 	height: 40px;
 	width: 100%;
 	margin-left: 20px;
+}
+
+.message-box{
+	margin: 0 20px;
+}
+.message-item{
+	border-bottom: 1px solid #cdcdcd;
+	margin-bottom: 20px;
+}
+.message-item h3{
+	border-left: 5px #1c89ff solid;
+	padding-left: 10px;
 }

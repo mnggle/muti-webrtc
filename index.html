@@ -33,13 +33,15 @@
       </div>
   </div>
   <div class="inside-room" id="insideRoom" style="display: none">
-    <h1 class="room">房间：<span id="roomName"></span></h1>
-    <div class="video-area">
-      <button class="small" id="disableVideo">摄像头</button>
+    <h1 class="room">房间：<span id="roomName"></span>&nbsp;&nbsp;用户名：<span id="curUsername"></span></h1>
+      <button class="small" id="disableVideo" style="margin-left: 20px;">摄像头</button>
       <button class="small" id="disableAudio">麦克风</button>
       <button class="handup small" id="hangupBtn">挂断</button>
-      <div class="video-box" id="videos">
+    <div class="video-area">
+      <div class="local-video">
         <video id="localVideo" autoplay muted></video>
+      </div>
+      <div class="remote-video" id="videos">
       </div>
     </div>
     <hr>

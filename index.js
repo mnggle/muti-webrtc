@@ -28,6 +28,7 @@ var app = https.createServer(credentials,function(req, res) {
 var io = socketIO.listen(app);
 // 创建后的房间都存入这个对象中
 var roomObj = {};
+var userObj = {};
 io.sockets.on('connection', function(socket) {
   var curRoom;
   // convenience function to log server messages on the client
@@ -46,17 +47,20 @@ io.sockets.on('connection', function(socket) {
     if (roomObj[curRoom].indexOf(socket.id)!==-1) {
       log('Client said: ', message);
       // for a real app, would be room-only (not broadcast)
-      if (message==="back id"||message.type=="answer"||message.type=="offer") {
-        socket.to(id).emit('message',message,socket.id);
+      if (message==="id back"||message.type=="answer"||message.type=="offer") {
+        socket.to(id).emit('message',message,socket.id,userObj);
       }else{
-        socket.to(curRoom).broadcast.emit('message', message,socket.id);
+        socket.to(curRoom).broadcast.emit('message', message,socket.id,userObj);
       }
     }
   });
-  socket.on('create or join', function(room) {
+
+  socket.on('create or join', function(room,username) {
     if (!roomObj[room]) {
       roomObj[room] = [];
     }
+    userObj[socket.id] = username;
+    // console.log(userObj)
     // 将用户socket id加入房间名单中
     roomObj[room].push(socket.id);
     //将获取到的room信息赋给该连接的全局变量curRoom
@@ -69,14 +73,17 @@ io.sockets.on('connection', function(socket) {
     log('Client ID ' + socket.id + ' created room ' + room);
     socket.emit('join', room,socket.id,numClients);
   });
+  
   socket.on('leave', function () {
     socket.emit('disconnect');
   });
   socket.on('disconnect', function(){
     console.log("receive disconnect event");
     // 退出房间
+    // console.log(userObj)
     socket.leave(curRoom,function(){
-      socket.to(curRoom).broadcast.emit('message', 'exit',socket.id);
+    delete userObj[socket.id]
+      socket.to(curRoom).broadcast.emit('message', 'exit',socket.id,userObj);
     }); 
     if (roomObj[curRoom]) {
       var index = roomObj[curRoom].indexOf(socket.id);
@@ -84,7 +91,7 @@ io.sockets.on('connection', function(socket) {
         roomObj[curRoom].splice(index, 1);
       }
       log('clients',roomObj)
-    }
+    };
   });
   // socket.on('ipaddr', function() {
   //   var ifaces = os.networkInterfaces();

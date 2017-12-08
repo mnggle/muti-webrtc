@@ -1,6 +1,7 @@
 'use strict';
 
 var localStream,//本地媒体对象
+    userObj = {},
     peerObj = {},// 用于存储多个RTCPeerConnection对象
     channelObj = {},//用于存储多个dataChannel对象
     fileBuffer = [],//文件流接受数组
@@ -11,6 +12,7 @@ var localStream,//本地媒体对象
     insideRoom = document.getElementById('insideRoom'),
     outsideRoom = document.getElementById('outsideRoom'),
     localName = document.getElementById('localName'),
+    curUsername = document.getElementById('curUsername'),
     joinRoom = document.getElementById('joinRoom'),
     localVideo = document.querySelector('#localVideo'),
     remoteVideo = document.querySelector('#remoteVideo'),
@@ -35,29 +37,28 @@ textSend.value = "";
 function sendData() {
   var data = textSend.value;
   //本地的消息显示
-  var myDiv = document.createElement("div");
-  myDiv.innerHTML = data;
-  myDiv.style.textAlign = "right";
-  messageBox.appendChild(myDiv)
+
+  _createMsg('我',data,'text')
   for(var id in channelObj){
     channelObj[id].send(data);
   };
   // 置空输入框
   textSend.value = "";
 };
-
 //创建/加入房间函数
 function createJoinFun(){
   // room = prompt('Enter room name:');
   room = joinRoom.value;
   username = localName.value;
   if (room&&username) {
-    socket.emit('create or join', room);
+    socket.emit('create or join', room,username);
     console.log('Attempted to create or  join room', room);
     var roomName = document.getElementById('roomName');
     roomName.innerText = room;
+    curUsername.innerText = username;
     outsideRoom.style.display = 'none';
     insideRoom.style.display = 'block';
+
   }else{
     alert('请输入姓名和房间名');
     return;
@@ -93,8 +94,9 @@ function sendMessage(message,id) {
 }
 // 监听消息接受
 // 参数id为信令服务器中触发message事件的socket对应的id
-socket.on('message', function(message,id) {
+socket.on('message', function(message,id,obj) {
   console.log('Client received message:', message);
+  userObj = obj;
   // console.log(message)
   if (message === 'start') {
     startCandidtdate(id,false);
@@ -105,6 +107,7 @@ socket.on('message', function(message,id) {
   } else if (message.type === 'offer') {
     peerObj[id].setRemoteDescription(new RTCSessionDescription(message));
     doAnswerFun(id);
+    // userObj = obj;
   } else if (message.type === 'answer') {
     peerObj[id].setRemoteDescription(new RTCSessionDescription(message));
   } else if (message.type === 'candidate') {
@@ -114,6 +117,7 @@ socket.on('message', function(message,id) {
     });
     peerObj[id].addIceCandidate(candidate);
   }else if(message==="id back"){
+    // userObj = obj;
     startCandidtdate(id,true);
     createOfferFun(id);
   }else if(message==='exit'){
@@ -177,12 +181,9 @@ function hangupFun(){
   channelObj = {};
   localVideo.src = "";
   var allVideoTag = videoBox.childNodes;
-  // 移除除了本地意外的video 标签
   for (var i = allVideoTag.length - 1; i >= 0; i--) {
-    if (allVideoTag[i].nodeName==="VIDEO"&&allVideoTag[i].id!='localVideo') {
-      videoBox.removeChild(allVideoTag[i]);
-    }
-  };
+    videoBox.removeChild(allVideoTag[i]);
+  }
 
 };
 
@@ -226,8 +227,6 @@ function getUserMidea(){
   })
   .then(gotStream)
   .catch(function(e) {
-    //不管是否有摄像头都发送链接消息
-    // sendMessage('got user media');
     alert('getUserMedia() error: ' + e.name);
   });
 };
@@ -257,9 +256,15 @@ function createPeerConnection(id) {
     peerObj[id].onaddstream = function(event){
         console.log(event)
         console.log('Remote stream added.');
-        var node = document.createElement('video')
-        videoBox.appendChild(node);
-        node.setAttribute("id", id);
+        var nodeBox = document.createElement('div');
+        var node = document.createElement('video');
+        var nodeP = document.createElement('p');
+        // nodeBox.style.display='inlineBlock';
+        nodeP.innerText=userObj[id];
+        nodeBox.appendChild(node);
+        nodeBox.appendChild(nodeP);
+        videoBox.appendChild(nodeBox)
+        nodeBox.setAttribute("id", id);
         node.setAttribute("autoplay", "autoplay");
         node.src = window.URL.createObjectURL(event.stream);
         // remoteStream = event.stream;
@@ -318,10 +323,9 @@ function createChannel(id,flag){
   // 收到消息后的回调函数
   var onReceiveMessageCallback = function(event) {
     if (typeof event.data ==="string") {
-      var newDiv = document.createElement("div");
-      newDiv.innerHTML = event.data;
-      messageBox.appendChild(newDiv);
+      _createMsg(userObj[id],event.data,'text')
     }else{
+
       fileBuffer.push(event.data);
       filesize += event.data.byteLength;
       console.log(channelObj[id].fileObj.filesize)
@@ -330,14 +334,9 @@ function createChannel(id,flag){
         var received = new window.Blob(fileBuffer);
         fileBuffer = [];
         readBlobAsDataURL(received,function(dataUrl){
-          var newDiv = document.createElement("div");
-          var newImg = document.createElement("img");
-          newImg.src=dataUrl;
-          newImg.width = "100";
-          newImg.height = "100";
-          newDiv.appendChild(newImg);
-          messageBox.appendChild(newDiv)
-        })
+          _createMsg(userObj[id],dataUrl,'img');
+        });
+
       }
       // downloadLink.href = URL.createObjectURL(received);
       // downloadLink.download = '123';
@@ -368,7 +367,24 @@ function createChannel(id,flag){
     };
   }
 };
+function _createMsg(name,data,type){
+    var inner = ""
+    var newDiv = document.createElement("div");
+    var newTitle = document.createElement("h3");
+    newDiv.setAttribute('class','message-item');
+    // newDiv.style.borderBottom='1px solid #cdcdcd';
+    // newDiv.style.marginBottom='15px'
 
+    // newTitle.innerHTML = userObj[id];
+    inner += "<h3>"+name+"</h3>"
+  if (type==="text") {
+      inner +="<p>"+data+"</p>"
+  }else{
+    inner +="<img src='"+data+"' width='100' height='100'>"
+  }
+  newDiv.innerHTML = inner;
+  messageBox.appendChild(newDiv);
+};
 // var constraints = {
 //   video: true
 // };
